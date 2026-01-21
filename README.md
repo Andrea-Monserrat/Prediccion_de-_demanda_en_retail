@@ -1,5 +1,5 @@
 # Prediccion_de-_demanda_en_retail
-## Objetivo
+## 🧠 Objetivo
 
 Desarrollar un modelo de Machine Learning end-to-end que prediga ventas futuras en retail, aplicando el flujo completo de ciencia de datos desde la exploración hasta la comunicación de resultados a stakeholders de negocio.
 
@@ -33,7 +33,7 @@ El Chief Operations Officer (COO) y el Chief Innovation Officer (CIO) han prepar
 
 ---
 
-## Datos
+## Datos 📚
 
 **Fuente:** [Kaggle - Predict Future Sales Competition](https://kaggle.com/competitions/competitive-data-science-predict-future-sales)
 
@@ -54,6 +54,25 @@ El Chief Operations Officer (COO) y el Chief Innovation Officer (CIO) han prepar
 **Root Mean Squared Error (RMSE)**
 
 
+## 🧩 Estructura del repositorio
+
+```text
+estancia-hospitalaria/
+├── README.md
+├── requirements.txt
+├── data/
+│   ├── item_categories.csv
+│   ├── items.csv
+│   ├── sales_train.csv
+│   ├── sample_submission.csv
+│   ├── shops.csv
+│   ├── test.csv
+│   └── processed/
+└── notebooks/
+    ├── 01_eda.ipynb
+    └── 02_model.ipynb
+```
+---
 📤 **Contacto:**
 * Paulina
 * Andrea Monserrat Arredondo Rodriguez - andrea.monserrat.ar@gmail.com

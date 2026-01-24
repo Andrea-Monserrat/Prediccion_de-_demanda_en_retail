@@ -1,6 +1,6 @@
 # Prediccion_de-_demanda_en_retail
 
-Para una mejor experiencia del Executive Summary, visita nuestro [sitio] (https://www.canva.com/design/DAG_TL3NbB4/aa1PBJr9WfFXWqwQEnkcAw/edit?utm_content=DAG_TL3NbB4&utm_campaign=designshare&utm_medium=link2&utm_source=sharebutton)
+Para una mejor experiencia del Executive Summary, visita nuestro [sitio](https://1c-company-itam.my.canva.site/m-s-software-cercano-al-cliente)
 ## 🧠 Objetivo
 
 Desarrollar un modelo de Machine Learning end-to-end que prediga ventas futuras en retail, aplicando el flujo completo de ciencia de datos desde la exploración hasta la comunicación de resultados a stakeholders de negocio.

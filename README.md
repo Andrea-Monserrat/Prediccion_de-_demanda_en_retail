@@ -61,7 +61,7 @@ El Chief Operations Officer (COO) y el Chief Innovation Officer (CIO) han prepar
 ```text
 estancia-hospitalaria/
 ├── README.md
-├── requirements.txt
+├── Executive_summary
 ├── data/
 │   ├── item_categories.csv
 │   ├── items.csv
@@ -71,8 +71,9 @@ estancia-hospitalaria/
 │   ├── test.csv
 │   └── processed/
 └── notebooks/
-    ├── 01_eda.ipynb
-    └── 02_model.ipynb
+    ├── 01_EDA.ipynb
+    ├── 01_EDA copy.ipynb
+    └── 02_Model_train.ipynb
 ```
 ---
 📤 **Contacto:**

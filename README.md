@@ -59,21 +59,42 @@ El Chief Operations Officer (COO) y el Chief Innovation Officer (CIO) han prepar
 ## 🧩 Estructura del repositorio
 
 ```text
-estancia-hospitalaria/
+Prediccion_de-_demanda_en_retail/
 ├── README.md
-├── Executive_summary
+├── artifacts/
+│   ├── feature_cols.json
+│   ├── model.joblib
+│   ├── train_report.json
+│   └── Predicción_de_demanda de retail_con_ML.pdf
 ├── data/
-│   ├── item_categories.csv
-│   ├── items.csv
-│   ├── sales_train.csv
-│   ├── sample_submission.csv
-│   ├── shops.csv
-│   ├── test.csv
-│   └── processed/
-└── notebooks/
-    ├── 01_EDA.ipynb
-    ├── 01_EDA copy.ipynb
-    └── 02_Model_train.ipynb
+│   ├── raw/
+│   │   ├── item_categories.csv
+│   │   ├── items.csv
+│   │   ├── sales_train.csv
+│   │   ├── sample_submission.csv
+│   │   ├── shops.csv
+│   │   ├── test.csv
+│   │   └── submission.csv
+│   ├── prep/
+│   │   ├── matrix.csv.gz
+│   │   ├── feature_cols.json
+│   │   ├── meta.json
+│   │   └── test_pairs.csv
+│   ├── inference/
+│   │   ├── items.csv
+│   │   ├── item_categories.csv
+│   │   ├── sales_train.csv
+│   │   ├── shops.csv
+│   │   └── test.csv
+│   └── predictions/
+├── notebooks/
+│   ├── 01_EDA.ipynb
+│   └── 02_Model_train.ipynb
+└── src/
+    ├── __init__.py
+    ├── prep.py
+    ├── train.py
+    └── inference.py
 ```
 ---
 📤 **Contacto:**

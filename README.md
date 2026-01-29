@@ -64,37 +64,43 @@ Prediccion_de-_demanda_en_retail/
 ├── artifacts/
 │   ├── feature_cols.json
 │   ├── model.joblib
-│   ├── train_report.json
-│   └── Predicción_de_demanda de retail_con_ML.pdf
+│   ├── Predicción_de_demanda de retail_con_ML.pdf
+│   └── train_report.json
 ├── data/
-│   ├── raw/
-│   │   ├── item_categories.csv
-│   │   ├── items.csv
-│   │   ├── sales_train.csv
-│   │   ├── sample_submission.csv
-│   │   ├── shops.csv
-│   │   ├── test.csv
-│   │   └── submission.csv
-│   ├── prep/
-│   │   ├── matrix.csv.gz
-│   │   ├── feature_cols.json
-│   │   ├── meta.json
-│   │   └── test_pairs.csv
 │   ├── inference/
 │   │   ├── items.csv
 │   │   ├── item_categories.csv
 │   │   ├── sales_train.csv
 │   │   ├── shops.csv
 │   │   └── test.csv
-│   └── predictions/
+│   ├── predictions/
+│   ├── prep/
+│   │   ├── feature_cols.json
+│   │   ├── matrix.csv.gz
+│   │   ├── meta.json
+│   │   └── test_pairs.csv
+│   └── raw/
+│       ├── items.csv
+│       ├── item_categories.csv
+│       ├── sales_train.csv
+│       ├── sample_submission.csv
+│       ├── shops.csv
+│       ├── submission.csv
+│       └── test.csv
+├── models/
+│   ├── feature_cols.json
+│   ├── final_best_model.pkl
+│   ├── hist_gb_model.pkl
+│   ├── poisson_model.pkl
+│   └── ridge_model.pkl
 ├── notebooks/
 │   ├── 01_EDA.ipynb
 │   └── 02_Model_train.ipynb
 └── src/
     ├── __init__.py
+    ├── inference.py
     ├── prep.py
-    ├── train.py
-    └── inference.py
+    └── train.py
 ```
 ---
 📤 **Contacto:**

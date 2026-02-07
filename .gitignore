@@ -78,6 +78,3 @@ artifacts/*.pdf
 # uv / Python env
 .venv/
 uv.lock
-
-# si te genera caché local
-.uv/

@@ -1,9 +1,20 @@
-# src/inference.py
+"""inference.py: Inferencia batch para predicción de demanda en retail.
+
+Entradas:
+- data/inference/test.csv
+- artifacts/models/model.joblib
+- artifacts/models/feature_cols.json
+
+Salida:
+- data/predictions/predictions.csv
+"""
+# pylint: disable=duplicate-code
 
 import argparse
 import json
 import time
 from pathlib import Path
+from typing import Any
 
 import joblib
 import numpy as np
@@ -12,17 +23,17 @@ import pandas as pd
 from prep import build_matrix
 from utils.logging_config import get_logger
 
-"""- `inference.py`: La entrada de este script son datos `data/inference` y el modelo entrenado `model.joblib`.
-La salida de este script son predicciones en batch que se guardan en `data/predictions`."""
-
+# Logger estándar del proyecto
 logger = get_logger("inference")
 
+# Nombre del target final y límites de clipping recomendados por el benchmark
 TARGET_COL = "item_cnt_month"
 CLIP_MIN = 0
 CLIP_MAX = 20
 
 
 def parse_args() -> argparse.Namespace:
+    """Parsea argumentos de línea de comandos para el script de inferencia."""
     parser = argparse.ArgumentParser()
     parser.add_argument("--inference-dir", default="data/inference")
     parser.add_argument("--models-dir", default="artifacts/models")
@@ -31,117 +42,199 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def _validar_archivo_existe(ruta: Path) -> None:
+    """Valida que un archivo exista (falla temprano y con contexto)."""
+    if not ruta.exists():
+        logger.error(
+            "action=validate_inputs status=failure missing_file=%s",
+            ruta.name,
+        )
+        raise FileNotFoundError(ruta)
+
+
+def _cargar_modelo_y_columnas(
+    dir_modelos: Path, nombre_modelo: str
+) -> tuple[Any, list[str]]:
+    """Carga el modelo entrenado y la lista de columnas (features) esperadas."""
+    # Archivos de salida del entrenamiento
+    ruta_modelo = dir_modelos / nombre_modelo
+    ruta_columnas = dir_modelos / "feature_cols.json"
+
+    _validar_archivo_existe(ruta_modelo)
+    _validar_archivo_existe(ruta_columnas)
+
+    # joblib para modelos sklearn
+    modelo = joblib.load(ruta_modelo)
+    # Las features deben coincidir exactamente con train.py
+    columnas_features = json.loads(ruta_columnas.read_text(encoding="utf-8"))
+
+    logger.info(
+        "action=load_model status=success model_file=%s n_features=%s",
+        ruta_modelo.name,
+        len(columnas_features),
+    )
+    return modelo, columnas_features
+
+
+def _cargar_test_csv(dir_inferencia: Path) -> pd.DataFrame:
+    """Carga test.csv, que contiene shop_id/item_id y (a veces) el ID de Kaggle."""
+    ruta_test = dir_inferencia / "test.csv"
+    _validar_archivo_existe(ruta_test)
+
+    datos_test = pd.read_csv(ruta_test, encoding="utf-8", low_memory=False)
+    logger.info(
+        "action=load_test status=success test_rows=%s",
+        f"{len(datos_test):,}",
+    )
+    return datos_test
+
+
+def _construir_filas_test(dir_inferencia: Path) -> pd.DataFrame:
+    """Reusa el mismo pipeline de features que prep, y selecciona el mes de test."""
+    # build_matrix genera la matriz completa con lags y agregados
+    matriz, _, meta, _ = build_matrix(dir_inferencia)
+    mes_test = int(meta["test_month"])
+
+    logger.info(
+        "action=build_matrix status=success rows_matrix=%s test_month=%s",
+        f"{matriz.shape[0]:,}",
+        mes_test,
+    )
+
+    # Nos quedamos SOLO con filas del mes de test para predecir
+    filas_test = matriz.loc[matriz["date_block_num"] == mes_test].copy()
+    logger.info(
+        "action=select_test_rows status=success rows=%s",
+        f"{len(filas_test):,}",
+    )
+    return filas_test
+
+
+def _preparar_features(
+    modelo: Any, filas_test: pd.DataFrame, columnas_features: list[str]
+) -> pd.DataFrame:
+    """Valida columnas, revisa NaNs y arma la matriz X (x_test) para el modelo."""
+    # Validación: que existan todas las columnas requeridas por el modelo
+    columnas_faltantes = [
+        col for col in columnas_features if col not in filas_test.columns
+    ]
+    if columnas_faltantes:
+        logger.error(
+            "action=validate_features status=failure missing_cols=%s missing_total=%s",
+            columnas_faltantes[:10],
+            len(columnas_faltantes),
+        )
+        mensaje = (
+            "Faltan columnas en matrix para inferencia: "
+            f"{columnas_faltantes[:10]} (total={len(columnas_faltantes)})"
+        )
+        raise ValueError(mensaje)
+
+    # X para inferencia (features en el mismo orden que en training)
+    x_test = filas_test[columnas_features]
+
+    # Warning si quedan NaNs (debería ser 0 si el prep está bien)
+    celdas_nan = int(x_test.isna().sum().sum())
+    if celdas_nan > 0:
+        logger.warning(
+            "action=validate_features status=warning nan_cells=%s",
+            f"{celdas_nan:,}",
+        )
+
+    # Si sklearn guardó nombres/orden de columnas, fuerza exactamente ese orden
+    if hasattr(modelo, "feature_names_in_"):
+        x_test = x_test.reindex(columns=list(modelo.feature_names_in_))
+        logger.info("action=reindex_features status=success")
+
+    return x_test
+
+
+def _predecir(modelo: Any, x_test: pd.DataFrame) -> np.ndarray:
+    """Predice y aplica clipping del target (0 a 20) por definición del problema."""
+    # predict devuelve float; clip recorta a rango permitido por el benchmark
+    preds = np.clip(modelo.predict(x_test), CLIP_MIN, CLIP_MAX)
+
+    logger.info(
+        "action=predict status=success n_predictions=%s",
+        f"{len(preds):,}",
+    )
+    return preds
+
+
+def _guardar_salida(
+    datos_test: pd.DataFrame, filas_test: pd.DataFrame, preds: np.ndarray, dir_pred: Path
+) -> Path:
+    """Une predicciones con el test original y escribe predictions.csv."""
+    # Construimos tabla mínima para merge por shop_id/item_id
+    tabla_pred = filas_test[["shop_id", "item_id"]].copy()
+    tabla_pred[TARGET_COL] = preds
+
+    # Merge para respetar el orden/IDs del test original
+    salida = datos_test.merge(tabla_pred, on=["shop_id", "item_id"], how="left")
+
+    ruta_salida = dir_pred / "predictions.csv"
+    salida.to_csv(ruta_salida, index=False)
+
+    logger.info(
+        "action=save status=success output_file=%s rows_out=%s",
+        ruta_salida.name,
+        f"{len(salida):,}",
+    )
+    return ruta_salida
+
+
 def main() -> None:
+    """Orquesta el flujo: cargar artefactos -> features -> predecir -> guardar."""
     args = parse_args()
-    start_time = time.time()
+    inicio = time.time()
 
     logger.info("action=inference status=started")
 
-    inference_dir = Path(args.inference_dir)
-    models_dir = Path(args.models_dir)
-    pred_dir = Path(args.pred_dir)
-    pred_dir.mkdir(parents=True, exist_ok=True)
-
-    model_path = models_dir / args.model_file
-    feature_cols_path = models_dir / "feature_cols.json"
-    test_path = inference_dir / "test.csv"
+    # Directorios de entrada/salida
+    dir_inferencia = Path(args.inference_dir)
+    dir_modelos = Path(args.models_dir)
+    dir_pred = Path(args.pred_dir)
+    dir_pred.mkdir(parents=True, exist_ok=True)
 
     try:
-        if not model_path.exists():
-            logger.error(
-                "action=validate_inputs status=failure missing_file=%s", model_path.name
-            )
-            raise FileNotFoundError(model_path)
-
-        if not feature_cols_path.exists():
-            logger.error(
-                "action=validate_inputs status=failure missing_file=%s",
-                feature_cols_path.name,
-            )
-            raise FileNotFoundError(feature_cols_path)
-
-        if not test_path.exists():
-            logger.error(
-                "action=validate_inputs status=failure missing_file=%s", test_path.name
-            )
-            raise FileNotFoundError(test_path)
-
-        model = joblib.load(model_path)
-        feature_cols = json.loads(feature_cols_path.read_text(encoding="utf-8"))
-        logger.info(
-            "action=load_model status=success model_file=%s n_features=%s",
-            model_path.name,
-            len(feature_cols),
+        # 1) Cargar modelo y lista de features
+        modelo, columnas_features = _cargar_modelo_y_columnas(
+            dir_modelos, args.model_file
         )
 
-        matrix, _, meta, _ = build_matrix(inference_dir)
-        test_month = int(meta["test_month"])
+        # 2) Cargar test.csv para conservar estructura/orden
+        datos_test = _cargar_test_csv(dir_inferencia)
+
+        # 3) Construir features del mes de test
+        filas_test = _construir_filas_test(dir_inferencia)
+
+        # 4) Preparar X y validar consistencia de columnas
+        x_test = _preparar_features(modelo, filas_test, columnas_features)
+
+        # 5) Predecir
+        preds = _predecir(modelo, x_test)
+
+        # 6) Guardar predictions.csv
+        ruta_salida = _guardar_salida(datos_test, filas_test, preds, dir_pred)
+
+        # Logging de tiempo de ejecución
+        duracion = time.time() - inicio
         logger.info(
-            "action=build_matrix status=success rows_matrix=%s test_month=%s",
-            f"{matrix.shape[0]:,}",
-            test_month,
+            "action=inference status=success output_file=%s duration_seconds=%.2f",
+            ruta_salida.name,
+            duracion,
         )
 
-        test_raw = pd.read_csv(test_path, encoding="utf-8", low_memory=False)
-        logger.info(
-            "action=load_test status=success test_rows=%s", f"{len(test_raw):,}"
-        )
-
-        test_rows = matrix.loc[matrix["date_block_num"] == test_month].copy()
-        logger.info(
-            "action=select_test_rows status=success rows=%s", f"{len(test_rows):,}"
-        )
-
-        missing = [c for c in feature_cols if c not in test_rows.columns]
-        if missing:
-            logger.error(
-                "action=validate_features status=failure missing_cols=%s missing_total=%s",
-                missing[:10],
-                len(missing),
-            )
-            raise ValueError(
-                f"Faltan columnas en matrix para inferencia: {missing[:10]} (total={len(missing)})"
-            )
-
-        X_test = test_rows[feature_cols]
-        nan_cells = int(X_test.isna().sum().sum())
-        if nan_cells > 0:
-            logger.warning(
-                "action=validate_features status=warning nan_cells=%s", f"{nan_cells:,}"
-            )
-
-        # Asegura orden exacto de columnas si el modelo lo guarda
-        if hasattr(model, "feature_names_in_"):
-            X_test = X_test.reindex(columns=list(model.feature_names_in_))
-            logger.info("action=reindex_features status=success")
-
-        preds = np.clip(model.predict(X_test), CLIP_MIN, CLIP_MAX)
-        logger.info("action=predict status=success n_predictions=%s", f"{len(preds):,}")
-
-        pred_tbl = test_rows[["shop_id", "item_id"]].copy()
-        pred_tbl[TARGET_COL] = preds
-
-        out = test_raw.merge(pred_tbl, on=["shop_id", "item_id"], how="left")
-
-        out_path = pred_dir / "predictions.csv"
-        out.to_csv(out_path, index=False)
-
-        duration = time.time() - start_time
-        logger.info(
-            "action=inference status=success output_file=%s rows_out=%s duration_seconds=%.2f",
-            out_path.name,
-            f"{len(out):,}",
-            duration,
-        )
-
+        # Prints
         print("OK inference")
-        print("Saved:", out_path)
+        print("Saved:", ruta_salida)
 
-    except Exception as e:
+    except Exception as exc:
+        # Log completo del stacktrace
         logger.error(
             "action=inference status=failure error_type=%s error_message=%s",
-            type(e).__name__,
-            str(e)[:200],
+            type(exc).__name__,
+            str(exc)[:200],
             exc_info=True,
         )
         raise

@@ -74,3 +74,10 @@ artifacts/*.pdf
 # =========================
 .env
 .env.*
+
+# uv / Python env
+.venv/
+uv.lock
+
+# (opcional) si te genera caché local
+.uv/

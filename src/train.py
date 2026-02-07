@@ -13,17 +13,28 @@ from sklearn.base import clone
 from sklearn.ensemble import HistGradientBoostingRegressor
 from sklearn.linear_model import Ridge, PoissonRegressor
 
+""" `train.py`: La entrada del script son datos `data/prep`. La salida del script es un modelo entrenado"""
 
-def rmse(y_true, y_pred):
+
+TARGET_COL = "item_cnt_month"
+BASELINE_COL = "item_cnt_month_lag_1"
+CLIP_MIN = 0
+CLIP_MAX = 20
+RANDOM_SEED = 42
+
+def rmse(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+    """Calcula Root Mean Squared Error."""
     return float(np.sqrt(mean_squared_error(y_true, y_pred)))
 
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--prep-dir", default="data/prep")
+    parser.add_argument("--models-dir", default="artifacts")
+    parser.add_argument("--model-file", default="model.joblib")
+    return parser.parse_args()
 
-def main():
-    p = argparse.ArgumentParser()
-    p.add_argument("--prep-dir", default="data/prep")
-    p.add_argument("--models-dir", default="artifacts")
-    p.add_argument("--model-file", default="model.joblib")
-    args = p.parse_args()
+def main() -> None:
+    args = parse_args()
 
     prep_dir = Path(args.prep_dir)
     models_dir = Path(args.models_dir)
@@ -38,69 +49,61 @@ def main():
 
     train_mask = matrix["date_block_num"] < valid_month
     valid_mask = matrix["date_block_num"] == valid_month
-    _ = matrix["date_block_num"] == test_month  # por consistencia con el notebook
 
     X_train = matrix.loc[train_mask, feature_cols]
-    y_train = matrix.loc[train_mask, "item_cnt_month"]
+    y_train = matrix.loc[train_mask, TARGET_COL]
 
     X_valid = matrix.loc[valid_mask, feature_cols]
-    y_valid = matrix.loc[valid_mask, "item_cnt_month"]
+    y_valid = matrix.loc[valid_mask, TARGET_COL]
 
-    pred_bl = X_valid["item_cnt_month_lag_1"].values
-    baseline_rmse = rmse(y_valid, pred_bl)
+    if BASELINE_COL not in X_valid.columns:
+        raise ValueError(f"Baseline feature '{BASELINE_COL}' no existe en feature_cols/prep output.")
 
-    model_hgb = HistGradientBoostingRegressor(
-        loss="squared_error",
-        max_depth=8,
-        learning_rate=0.08,
-        max_iter=400,
-        random_state=42,
-    )
-    model_ridge = Ridge(alpha=1.0)
-    model_pois = PoissonRegressor(alpha=1e-4, max_iter=200)
+    pred_baseline = X_valid[BASELINE_COL].to_numpy()
+    baseline_rmse = rmse(y_valid.to_numpy(), pred_baseline)
 
     candidates = {
-        "HistGradientBoosting": model_hgb,
-        "Ridge": model_ridge,
-        "PoissonRegressor": model_pois,
+        "HistGradientBoosting": HistGradientBoostingRegressor(
+            loss="squared_error",
+            max_depth=8,
+            learning_rate=0.08,
+            max_iter=400,
+            random_state=RANDOM_SEED,
+        ),
+        "Ridge": Ridge(alpha=1.0),
+        "PoissonRegressor": PoissonRegressor(alpha=1e-4, max_iter=200),
     }
 
-    scores = {}
-    fitted = {}
+    scores: dict[str, float] = {}
+    fitted: dict[str, object] = {}
 
-    for name, m in candidates.items():
-        m.fit(X_train, y_train)
-        pred = np.clip(m.predict(X_valid), 0, 20)
-        scores[name] = rmse(y_valid, pred)
-        fitted[name] = m
+    for name, model in candidates.items():
+        model.fit(X_train, y_train)
+        pred = np.clip(model.predict(X_valid), CLIP_MIN, CLIP_MAX)
+        scores[name] = rmse(y_valid.to_numpy(), pred)
+        fitted[name] = model
 
     best_name = min(scores, key=scores.get)
 
     X_full = pd.concat([X_train, X_valid], axis=0)
     y_full = pd.concat([y_train, y_valid], axis=0)
 
-    model_final = clone(fitted[best_name])
+    # Re-entrenar desde el estimador base (sin estado) para evitar problemas de clonar un fitted model
+    model_final = clone(candidates[best_name])
     model_final.fit(X_full, y_full)
 
     joblib.dump(model_final, models_dir / args.model_file)
 
-    (models_dir / "train_report.json").write_text(
-        json.dumps(
-            {
-                "baseline_rmse_lag_1": baseline_rmse,
-                "scores": scores,
-                "best_model": best_name,
-                "valid_month": valid_month,
-                "test_month": test_month,
-            },
-            indent=2,
-        ),
-        encoding="utf-8",
-    )
+    report = {
+        "baseline_rmse_lag_1": baseline_rmse,
+        "scores": scores,
+        "best_model": best_name,
+        "valid_month": valid_month,
+        "test_month": test_month,
+    }
 
-    (models_dir / "feature_cols.json").write_text(
-        json.dumps(feature_cols, indent=2), encoding="utf-8"
-    )
+    (models_dir / "train_report.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
+    (models_dir / "feature_cols.json").write_text(json.dumps(feature_cols, indent=2), encoding="utf-8")
 
     print("OK train")
     print("Baseline RMSE (lag_1):", round(baseline_rmse, 4))

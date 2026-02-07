@@ -8,16 +8,27 @@ import numpy as np
 import pandas as pd
 import joblib
 
-from prep import build_matrix   # si lo sigues corriendo como: python src/inference.py
+from prep import build_matrix 
+
+"""- `inference.py`: La entrada de este script son datos `data/inference` y el modelo entrenado `model.joblib`. 
+La salida de este script son predicciones en batch que se guardan en `data/predictions`."""
 
 
-def main():
-    p = argparse.ArgumentParser()
-    p.add_argument("--inference-dir", default="data/inference")
-    p.add_argument("--models-dir", default="artifacts")
-    p.add_argument("--pred-dir", default="data/predictions")
-    p.add_argument("--model-file", default="model.joblib")
-    args = p.parse_args()
+TARGET_COL = "item_cnt_month"
+CLIP_MIN = 0
+CLIP_MAX = 20
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--inference-dir", default="data/inference")
+    parser.add_argument("--models-dir", default="artifacts")
+    parser.add_argument("--pred-dir", default="data/predictions")
+    parser.add_argument("--model-file", default="model.joblib")
+    return parser.parse_args()
+
+def main() -> None:
+    args = parse_args()
 
     inference_dir = Path(args.inference_dir)
     models_dir = Path(args.models_dir)
@@ -33,17 +44,24 @@ def main():
     test_raw = pd.read_csv(inference_dir / "test.csv", encoding="utf-8", low_memory=False)
 
     test_rows = matrix.loc[matrix["date_block_num"] == test_month].copy()
+
+    missing = [c for c in feature_cols if c not in test_rows.columns]
+    if missing:
+        raise ValueError(f"Faltan columnas en matrix para inferencia: {missing[:10]} (total={len(missing)})")
+
     X_test = test_rows[feature_cols]
 
+    # Asegura orden exacto de columnas si el modelo lo guarda
     if hasattr(model, "feature_names_in_"):
         X_test = X_test.reindex(columns=list(model.feature_names_in_))
 
-    preds = np.clip(model.predict(X_test), 0, 20)
+    preds = np.clip(model.predict(X_test), CLIP_MIN, CLIP_MAX)
 
-    pred_df = test_rows[["shop_id", "item_id"]].copy()
-    pred_df["item_cnt_month"] = preds
+    pred_tbl = test_rows[["shop_id", "item_id"]].copy()
+    pred_tbl[TARGET_COL] = preds
 
-    out = test_raw.merge(pred_df, on=["shop_id", "item_id"], how="left")
+    # Merge para mapear a test.csv
+    out = test_raw.merge(pred_tbl, on=["shop_id", "item_id"], how="left")
 
     out_path = pred_dir / "predictions.csv"
     out.to_csv(out_path, index=False)

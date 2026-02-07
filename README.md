@@ -103,8 +103,35 @@ Prediccion_de-_demanda_en_retail/
     └── train.py
 ```
 ---
+
+## 🧪 Clonar y ejecutar con uv
+
+### 1) Clonar el repositorio
+```bash
+git clone https://github.com/Andrea-Monserrat/Prediccion_de-_demanda_en_retail.git
+cd Prediccion_de-_demanda_en_retail
+```
+
+### 2) Configurar el entorno con uv
+```bash
+uv python pin 3.12
+uv python install 3.12
+uv sync
+```
+
+### 3) Ejecutar el pipeline
+```bash
+uv run python src/prep.py
+uv run python src/train.py
+uv run python src/inference.py
+```
+
+### 4) Abrir notebooks
+```bash
+uv run jupyter lab
+```
+
+---
 📤 **Contacto:**
 * Paulina Garza - paugarza2208@gmail.com
 * Andrea Monserrat Arredondo Rodriguez - andrea.monserrat.ar@gmail.com
-
-

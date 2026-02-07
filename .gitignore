@@ -79,5 +79,5 @@ artifacts/*.pdf
 .venv/
 uv.lock
 
-# (opcional) si te genera caché local
+# si te genera caché local
 .uv/

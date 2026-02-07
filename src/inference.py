@@ -22,7 +22,7 @@ CLIP_MAX = 20
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--inference-dir", default="data/inference")
-    parser.add_argument("--models-dir", default="artifacts")
+    parser.add_argument("--models-dir", default="artifacts/models")
     parser.add_argument("--pred-dir", default="data/predictions")
     parser.add_argument("--model-file", default="model.joblib")
     return parser.parse_args()

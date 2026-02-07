@@ -1,6 +1,12 @@
 # Prediccion_de-_demanda_en_retail
 
 Para una mejor experiencia del Executive Summary, visita nuestro [sitio](https://1c-company-itam.my.canva.site/m-s-software-cercano-al-cliente)
+
+## Descripción del proyecto
+
+Este repositorio implementa un pipeline end-to-end de Machine Learning para **pronosticar ventas futuras** (demanda mensual) a nivel **producto–tienda–mes**, basado en el dataset de la competencia *Predict Future Sales*. El flujo cubre exploración, preparación de features, entrenamiento, evaluación y generación de predicciones en batch.
+
+
 ## 🧠 Objetivo
 
 Desarrollar un modelo de Machine Learning end-to-end que prediga ventas futuras en retail, aplicando el flujo completo de ciencia de datos desde la exploración hasta la comunicación de resultados a stakeholders de negocio.
@@ -55,53 +61,69 @@ El Chief Operations Officer (COO) y el Chief Innovation Officer (CIO) han prepar
 
 **Root Mean Squared Error (RMSE)**
 
+---
+
+## Resultados
+
+- **Tamaño de datos cargados:** `items` = 22,170 filas; `sales_train` = 2,935,849 filas; `test` = 214,200 filas.
+- **Limpieza aplicada:** se removieron 7,357 registros inválidos (precio ≤ 0 o ventas negativas).
+- **Matriz final de features:** 11,098,754 filas y 19 features (meses 0–33; `test_month` = 34).
+- **Validación (mes 33):**
+  - Baseline (`item_cnt_month_lag_1`): **RMSE = 6.2925**
+  - HistGradientBoostingRegressor: **RMSE = 2.9408** (mejor)
+  - Ridge: RMSE = 3.3832
+  - PoissonRegressor: RMSE = 3.4567
+- **Tiempos de ejecución (máquina local):**
+  - `train.py`: 44.11 s
+  - `inference.py`: 56.07 s
+- **Salida de inferencia:** `data/predictions/predictions.csv` (214,200 filas).
+- Los logs de ejecución se guardan en `artifacts/logs/`.
+
+**Kaggle leaderboard:** https://kaggle.com/competitions/competitive-data-science-predict-future-sales/leaderboard
+
+---
+
+## Dependencias principales
+
+- pandas
+- numpy
+- scikit-learn
+- joblib
+- jupyter (para notebooks)
+
+---
 
 ## 🧩 Estructura del repositorio
 
 ```text
 Prediccion_de-_demanda_en_retail/
+├── .gitignore
+├── .python-version
 ├── README.md
+├── pyproject.toml
+├── uv.lock
 ├── artifacts/
-│   ├── feature_cols.json
-│   ├── model.joblib
 │   ├── Predicción_de_demanda de retail_con_ML.pdf
-│   └── train_report.json
+│   ├── img/
+│   ├── logs/
+│   └── models/
 ├── data/
 │   ├── inference/
-│   │   ├── items.csv
-│   │   ├── item_categories.csv
-│   │   ├── sales_train.csv
-│   │   ├── shops.csv
-│   │   └── test.csv
 │   ├── predictions/
 │   ├── prep/
-│   │   ├── feature_cols.json
-│   │   ├── matrix.csv.gz
-│   │   ├── meta.json
-│   │   └── test_pairs.csv
 │   └── raw/
-│       ├── items.csv
-│       ├── item_categories.csv
-│       ├── sales_train.csv
-│       ├── sample_submission.csv
-│       ├── shops.csv
-│       ├── submission.csv
-│       └── test.csv
-├── models/
-│   ├── feature_cols.json
-│   ├── final_best_model.pkl
-│   ├── hist_gb_model.pkl
-│   ├── poisson_model.pkl
-│   └── ridge_model.pkl
 ├── notebooks/
 │   ├── 01_EDA.ipynb
 │   └── 02_Model_train.ipynb
 └── src/
-    ├── __init__.py
     ├── inference.py
     ├── prep.py
-    └── train.py
+    ├── train.py
+    └── utils/
+        ├── __init__.py
+        └── logging_config.py
 ```
+
 ---
 
 ## 🧪 Clonar y ejecutar con uv
@@ -114,12 +136,10 @@ cd Prediccion_de-_demanda_en_retail
 
 ### 2) Configurar el entorno con uv
 ```bash
-uv python pin 3.12
-uv python install 3.12
 uv sync
 ```
 
-### 3) Ejecutar el pipeline
+### 3) Ejecutar el pipeline (scripts)
 ```bash
 uv run python src/prep.py
 uv run python src/train.py
@@ -130,6 +150,30 @@ uv run python src/inference.py
 ```bash
 uv run jupyter lab
 ```
+
+---
+
+## 📌 Scripts del pipeline (inputs/outputs)
+
+- `src/prep.py`  
+  - **Input:** `data/raw/`  
+  - **Output:** `data/prep/` (por ejemplo: `matrix.csv.gz`, `meta.json`, `feature_cols.json`)
+
+- `src/train.py`  
+  - **Input:** `data/prep/`  
+  - **Output:** `artifacts/models/` (por ejemplo: `model.joblib`, `train_report.json`, `feature_cols.json`)
+
+- `src/inference.py`  
+  - **Input:** `data/inference/` + `artifacts/models/model.joblib`  
+  - **Output:** `data/predictions/predictions.csv`
+
+---
+
+## ✅ Calidad de Código
+
+Evidencia de linting con **pylint** ejecutado sobre el directorio `src/`, con score final **10.0/10**.
+
+![Salida de pylint (10/10)](artifacts/img/prueba_pylint.png)
 
 ---
 📤 **Contacto:**

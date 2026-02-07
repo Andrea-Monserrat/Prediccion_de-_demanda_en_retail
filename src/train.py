@@ -9,9 +9,6 @@ Salidas:
 - artifacts/models/model.joblib
 - artifacts/models/train_report.json
 - artifacts/models/feature_cols.json
-
-Convenciones:
-- PEP 8: docstrings, snake_case, líneas <= 100, nombres claros.
 """
 # pylint: disable=duplicate-code
 

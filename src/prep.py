@@ -23,6 +23,8 @@ CLIP_TARGET_MAX: int = 20
 
 """El uso de TypedDict junto con librerías que ofrecen comportamiento tipo "MetaDict" (como la librería metadict o Pydantic) 
 permite estructurar diccionarios en Python con tipado estático, autocompletado de IDE y, a menudo, acceso por atributos"""
+
+
 class MetaDict(TypedDict):
     first_month: int
     last_month: int
@@ -33,18 +35,16 @@ class MetaDict(TypedDict):
     n_features: int
 
 
-def add_shop_size_category(tbl: pd.DataFrame,shop_col: str = "shop_id",target_col: str = "item_cnt_month") -> pd.DataFrame:
+def add_shop_size_category(
+    tbl: pd.DataFrame, shop_col: str = "shop_id", target_col: str = "item_cnt_month"
+) -> pd.DataFrame:
     """
     Clasifica las tiendas en 'small', 'average', 'large' según el total
     de ventas (target_col) usando percentiles 33% y 66%.
     """
 
     # Total vendido por tienda
-    shop_totals = (
-        tbl.groupby(shop_col)[target_col]
-        .sum()
-        .sort_values(ascending=False)
-    )
+    shop_totals = tbl.groupby(shop_col)[target_col].sum().sort_values(ascending=False)
 
     # Percentiles
     p33 = shop_totals.quantile(0.33)
@@ -62,7 +62,12 @@ def add_shop_size_category(tbl: pd.DataFrame,shop_col: str = "shop_id",target_co
     return tbl_resultado
 
 
-def add_lags(tbl: pd.DataFrame,lags: Sequence[int],feature_cols: Sequence[str],key_cols: Sequence[str] = KEY_COLS) -> pd.DataFrame:
+def add_lags(
+    tbl: pd.DataFrame,
+    lags: Sequence[int],
+    feature_cols: Sequence[str],
+    key_cols: Sequence[str] = KEY_COLS,
+) -> pd.DataFrame:
     """
     Agrega variables rezagadas (lag features) para `feature_cols` usando `key_cols` como llave.
 
@@ -86,8 +91,13 @@ def add_lags(tbl: pd.DataFrame,lags: Sequence[int],feature_cols: Sequence[str],k
     return tbl_resultado
 
 
-
-def add_group_mean_lag(tbl: pd.DataFrame,group_cols: Sequence[str],target_col: str,lag: int = 1,feature_name: str | None = None,) -> pd.DataFrame:
+def add_group_mean_lag(
+    tbl: pd.DataFrame,
+    group_cols: Sequence[str],
+    target_col: str,
+    lag: int = 1,
+    feature_name: str | None = None,
+) -> pd.DataFrame:
     """
     Calcula la media de `target_col` por (date_block_num + group_cols),
     le aplica un desplazamiento temporal (+lag) y la une (left join) a la tabla original.
@@ -106,6 +116,7 @@ def add_group_mean_lag(tbl: pd.DataFrame,group_cols: Sequence[str],target_col: s
     tbl_mean["date_block_num"] = tbl_mean["date_block_num"] + lag
 
     return tbl.merge(tbl_mean, on=merge_cols, how="left")
+
 
 def build_matrix(raw_dir: Path) -> tuple[pd.DataFrame, list[str], MetaDict, pd.DataFrame]:
     items = pd.read_csv(raw_dir / "items.csv", encoding="utf-8", low_memory=False)
@@ -126,14 +137,20 @@ def build_matrix(raw_dir: Path) -> tuple[pd.DataFrame, list[str], MetaDict, pd.D
     test_month = last_month + 1
 
     tbl_month_sales = (
-        tbl_sales.groupby(KEY_COLS, as_index=False)
-        .agg(
+        tbl_sales.groupby(KEY_COLS, as_index=False).agg(
             item_cnt_month=("item_cnt_day", "sum"),
             item_price_mean=("item_price", "mean"),
             revenue_month=("revenue_day", "sum"),
         )
     )
     tbl_month_sales = add_shop_size_category(tbl_month_sales)
+
+    # shop_size depende solo de shop_id (no de item_id), guardamos el mapeo por tienda
+    shop_size_by_shop = (
+        tbl_month_sales[["shop_id", "shop_size"]]
+        .drop_duplicates("shop_id")
+        .set_index("shop_id")["shop_size"]
+    )
 
     # ---- grid por mes + agregar mes de test (igual que notebook) ----
     grid_arrays: list[np.ndarray] = []
@@ -157,8 +174,16 @@ def build_matrix(raw_dir: Path) -> tuple[pd.DataFrame, list[str], MetaDict, pd.D
 
     # codificación numérica (recomendado para modelos)
     shop_size_map = {"small": 0, "average": 1, "large": 2}
-    tbl_matrix["shop_size"] = tbl_matrix["shop_size"].map(shop_size_map).astype(np.int8)
 
+    # Si quedó NaN tras el merge por KEY_COLS, lo rellenamos usando el mapeo por shop_id
+    tbl_matrix["shop_size"] = tbl_matrix["shop_size"].fillna(
+        tbl_matrix["shop_id"].map(shop_size_by_shop)
+    )
+
+    # Fallback final (por si hay shop_id raros): "average"
+    tbl_matrix["shop_size"] = tbl_matrix["shop_size"].fillna("average")
+
+    tbl_matrix["shop_size"] = tbl_matrix["shop_size"].map(shop_size_map).astype(np.int8)
 
     for col in ["item_cnt_month", "item_price_mean", "revenue_month"]:
         tbl_matrix[col] = tbl_matrix[col].fillna(0).astype(np.float32)
@@ -194,7 +219,6 @@ def build_matrix(raw_dir: Path) -> tuple[pd.DataFrame, list[str], MetaDict, pd.D
         feature_name="cat_mean_lag_1",
     )
 
-
     lag_cols = [c for c in tbl_matrix.columns if "lag_" in c] + [
         "shop_mean_lag_1",
         "item_mean_lag_1",
@@ -205,7 +229,7 @@ def build_matrix(raw_dir: Path) -> tuple[pd.DataFrame, list[str], MetaDict, pd.D
 
     tbl_matrix[lag_cols] = tbl_matrix[lag_cols].fillna(0).astype(np.float32)
 
-    feature_cols = ["shop_id", "item_id", "item_category_id", "month", "year","shop_size"] + lag_cols
+    feature_cols = ["shop_id", "item_id", "item_category_id", "month", "year", "shop_size"] + lag_cols
 
     meta: MetaDict = {
         "first_month": first_month,
@@ -217,7 +241,6 @@ def build_matrix(raw_dir: Path) -> tuple[pd.DataFrame, list[str], MetaDict, pd.D
         "n_features": int(len(feature_cols)),
     }
 
-
     return tbl_matrix, feature_cols, meta, tbl_test_pairs_with_id
 
 
@@ -226,6 +249,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--raw-dir", default="data/raw", help="Directorio de entrada (raw)")
     parser.add_argument("--prep-dir", default="data/prep", help="Directorio de salida (prep)")
     return parser.parse_args()
+
 
 def main() -> None:
     args = parse_args()
@@ -253,5 +277,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
-

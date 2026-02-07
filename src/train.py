@@ -29,7 +29,7 @@ def rmse(y_true: np.ndarray, y_pred: np.ndarray) -> float:
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--prep-dir", default="data/prep")
-    parser.add_argument("--models-dir", default="artifacts")
+    parser.add_argument("--models-dir", default="artifacts/models")
     parser.add_argument("--model-file", default="model.joblib")
     return parser.parse_args()
 

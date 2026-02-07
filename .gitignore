@@ -1,0 +1,76 @@
+# =========================
+# OS / Editor
+# =========================
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+
+# =========================
+# Python
+# =========================
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+ENV/
+*.egg-info/
+dist/
+build/
+
+# =========================
+# Jupyter
+# =========================
+.ipynb_checkpoints/
+
+# =========================
+# Data: NO subir datos, pero sí carpetas vacías con .gitkeep
+# =========================
+data/**
+!data/**/
+!data/**/.gitkeep
+
+# =========================
+# Logs: NO subir logs, pero sí carpeta vacía con .gitkeep
+# =========================
+artifacts/logs/**
+!artifacts/logs/**/
+!artifacts/logs/.gitkeep
+
+# =========================
+# Modelos: NO subir modelos, pero sí carpetas vacías con .gitkeep
+# =========================
+artifacts/models/**
+!artifacts/models/**/
+!artifacts/models/**/.gitkeep
+
+# (por si todavía existe / vuelve a existir la carpeta models en raíz)
+models/**
+!models/**/
+!models/**/.gitkeep
+
+# =========================
+# Otros artifacts pesados (opcionales)
+# =========================
+artifacts/*.joblib
+artifacts/*.pkl
+artifacts/*.pickle
+artifacts/*.onnx
+artifacts/*.pdf
+
+# =========================
+# Temp
+# =========================
+*.tmp
+*.temp
+*.bak
+*.swp
+*.swo
+
+# =========================
+# Secrets
+# =========================
+.env
+.env.*

@@ -228,7 +228,7 @@ docker run \
 
 ![Docker build en EC2](artifacts/img/ec2_docker_build.png)
 
-![Docker run en EC2](artifacts/img/ec2_docker_run.png)
+![Docker run en EC2](artifacts/img/EC2.png)
 
 ---
 

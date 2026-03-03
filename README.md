@@ -116,9 +116,24 @@ Prediccion_de-_demanda_en_retail/
 │   ├── 01_EDA.ipynb
 │   └── 02_Model_train.ipynb
 └── src/
-    ├── inference.py
-    ├── prep.py
-    ├── train.py
+    ├── preprocessing/
+    │   ├── __main__.py
+    │   ├── prep.py
+    │   ├── Dockerfile
+    │   └── test/
+    │       └── test_prep.py
+    ├── training/
+    │   ├── __main__.py
+    │   ├── train.py
+    │   ├── Dockerfile
+    │   └── test/
+    │       └── test_train.py
+    ├── inference/
+    │   ├── __main__.py
+    │   ├── inference.py
+    │   ├── Dockerfile
+    │   └── test/
+    │       └── test_inference.py
     └── utils/
         ├── __init__.py
         └── logging_config.py
@@ -139,11 +154,11 @@ cd Prediccion_de-_demanda_en_retail
 uv sync
 ```
 
-### 3) Ejecutar el pipeline (scripts)
+### 3) Ejecutar el pipeline localmente
 ```bash
-uv run python src/prep.py
-uv run python src/train.py
-uv run python src/inference.py
+uv run python -m preprocessing --raw-dir data/raw --prep-dir data/prep
+uv run python -m training --prep-dir data/prep --models-dir artifacts/models
+uv run python -m inference --inference-dir data/inference --models-dir artifacts/models --pred-dir data/predictions
 ```
 
 ### 4) Abrir notebooks
@@ -155,17 +170,100 @@ uv run jupyter lab
 
 ## 📌 Scripts del pipeline (inputs/outputs)
 
-- `src/prep.py`  
-  - **Input:** `data/raw/`  
-  - **Output:** `data/prep/` (por ejemplo: `matrix.csv.gz`, `meta.json`, `feature_cols.json`)
+| Script | Input | Output |
+|--------|-------|--------|
+| `preprocessing/prep.py` | `data/raw/` | `data/prep/` (`matrix.csv.gz`, `meta.json`, `feature_cols.json`) |
+| `training/train.py` | `data/prep/` | `artifacts/models/` (`model.joblib`, `train_report.json`) |
+| `inference/inference.py` | `data/inference/` + `artifacts/models/model.joblib` | `data/predictions/predictions.csv` |
 
-- `src/train.py`  
-  - **Input:** `data/prep/`  
-  - **Output:** `artifacts/models/` (por ejemplo: `model.joblib`, `train_report.json`, `feature_cols.json`)
+---
 
-- `src/inference.py`  
-  - **Input:** `data/inference/` + `artifacts/models/model.joblib`  
-  - **Output:** `data/predictions/predictions.csv`
+## 🐳 Ejecución del pipeline con Docker
+
+Cada step del pipeline tiene su propio `Dockerfile`. Las imágenes se construyen desde la raíz del repo:
+
+```bash
+docker build -t ml-preprocessing:latest ./src/preprocessing/
+docker build -t ml-training:latest       ./src/training/
+docker build -t ml-inference:latest      ./src/inference/
+```
+
+### Ejecución de contenedores con argumentos
+
+**Step 1 — Preprocessing:**
+```bash
+docker run \
+  -v $(pwd)/data:/app/data \
+  -v $(pwd)/artifacts:/app/artifacts \
+  ml-preprocessing:latest \
+  --raw-dir data/raw \
+  --prep-dir data/prep
+```
+
+**Step 2 — Training** (con hiperparámetros configurables):
+```bash
+docker run \
+  -v $(pwd)/data:/app/data \
+  -v $(pwd)/artifacts:/app/artifacts \
+  ml-training:latest \
+  --prep-dir data/prep \
+  --models-dir artifacts/models \
+  --n-estimators 400 \
+  --max-depth 8 \
+  --learning-rate 0.08
+```
+
+**Step 3 — Inference:**
+```bash
+docker run \
+  -v $(pwd)/data:/app/data \
+  -v $(pwd)/artifacts:/app/artifacts \
+  ml-inference:latest \
+  --inference-dir data/inference \
+  --models-dir artifacts/models \
+  --pred-dir data/predictions
+```
+
+### Evidencia de construcción en EC2
+
+![Docker build en EC2](artifacts/img/ec2_docker_build.png)
+
+![Docker run en EC2](artifacts/img/ec2_docker_run.png)
+
+---
+
+## 🔧 Mejora del caso de uso
+
+Se añadió soporte de hiperparámetros vía CLI en el step de training, lo que permite ajustar el modelo sin tocar el código:
+
+| Argumento | Default | Descripción |
+|-----------|---------|-------------|
+| `--n-estimators` | 400 | Número de iteraciones del HistGradientBoosting |
+| `--max-depth` | 8 | Profundidad máxima del árbol |
+| `--learning-rate` | 0.08 | Tasa de aprendizaje |
+
+Con los valores por defecto se obtiene **RMSE = 2.9408** en validación (mes 33), por debajo del target de RMSE < 5 definido por el COO.
+
+---
+
+## 🧬 Pruebas Unitarias
+
+El proyecto cuenta con **7 pruebas unitarias** organizadas dentro de cada step:
+
+```
+src/
+├── preprocessing/test/test_prep.py   (3 tests)
+├── training/test/test_train.py       (3 tests)
+└── inference/test/test_inference.py  (1 test)
+```
+
+Para ejecutar todas las pruebas desde la raíz del repo:
+
+```bash
+uv run pytest src/ -v
+```
+
+![Output de pytest (7 tests)](artifacts/img/pytest_output.png)
 
 ---
 
@@ -176,6 +274,7 @@ Evidencia de linting con **pylint** ejecutado sobre el directorio `src/`, con sc
 ![Salida de pylint (10/10)](artifacts/img/prueba_pylint.png)
 
 ---
+
 📤 **Contacto:**
 * Paulina Garza - paugarza2208@gmail.com
 * Andrea Monserrat Arredondo Rodriguez - andrea.monserrat.ar@gmail.com

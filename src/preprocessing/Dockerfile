@@ -1,7 +1,7 @@
-# Dockerfile
-FROM python:3.14
+# Dockerfile — Step: preprocessing
+FROM python:3.12-slim
 
-# Instalar dependencias de machine learning con versiones específicas
+# Instalar dependencias de machine learning
 RUN pip install --no-cache-dir \
     numpy==2.4.2 \
     pandas==3.0.1 \

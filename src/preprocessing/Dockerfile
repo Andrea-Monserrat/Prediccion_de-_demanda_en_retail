@@ -14,6 +14,9 @@ WORKDIR /app
 # Copiar código fuente
 COPY ./src ./src
 
+# Copiar data
+COPY ./data ./data
+
 # PYTHONPATH para que los imports funcionen (ej: from utils.logging_config import ...)
 ENV PYTHONPATH=/app/src
 

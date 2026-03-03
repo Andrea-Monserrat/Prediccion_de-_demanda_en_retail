@@ -228,7 +228,7 @@ docker run \
 
 ![Docker build en EC2](artifacts/img/ec2_docker_build.png)
 
-![Docker run en EC2](artifacts/img/EC2.png)
+![Docker run en EC2](artifacts/img/image_EC2.png)
 
 ---
 
@@ -278,3 +278,6 @@ Evidencia de linting con **pylint** ejecutado sobre el directorio `src/`, con sc
 📤 **Contacto:**
 * Paulina Garza - paugarza2208@gmail.com
 * Andrea Monserrat Arredondo Rodriguez - andrea.monserrat.ar@gmail.com
+
+
+[def]: artifacts/img/EC2.png

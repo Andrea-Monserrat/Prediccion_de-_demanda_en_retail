@@ -241,7 +241,7 @@ docker run \
 
 ### Evidencia de entrenamiento en Sagemaker
 
-![Docker run en EC2](artifacts/img/prueba_pylint.png)
+![Docker run en EC2](artifacts/img/imagen_en_ECR.png)
 
 ### Evidencia de endpoint con inferencias en tiempo real
 ![Docker run en EC2](artifacts/img/pytest_output.png)

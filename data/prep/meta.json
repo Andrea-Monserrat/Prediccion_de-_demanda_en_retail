@@ -1,0 +1,15 @@
+{
+  "first_month": 0,
+  "last_month": 33,
+  "test_month": 34,
+  "valid_month": 33,
+  "lags": [
+    1,
+    2,
+    3,
+    6,
+    12
+  ],
+  "n_rows_matrix": 11098754,
+  "n_features": 19
+}

@@ -115,6 +115,15 @@ Prediccion_de-_demanda_en_retail/
 ├── notebooks/
 │   ├── 01_EDA.ipynb
 │   └── 02_Model_train.ipynb
+|
+├── sagemaker/container
+│   ├── retail_forecast
+│   │  ├── predictor.py
+│   │  ├── serve
+│   │  ├── train
+│   │  └── wsgi.py
+│   ├── build_and_push.sh
+│   └── Dockerfile
 └── src/
     ├── preprocessing/
     │   ├── __main__.py
@@ -226,11 +235,16 @@ docker run \
 
 ### Evidencia de construcción en EC2
 
-![Docker build en EC2](artifacts/img/ec2_docker_build.png)
-
 ![Docker run en EC2](artifacts/img/image_EC2.png)
 
 ---
+
+### Evidencia de entrenamiento en Sagemaker
+
+![Docker run en EC2](artifacts/img/prueba_pylint.png)
+
+### Evidencia de endpoint con inferencias en tiempo real
+![Docker run en EC2](artifacts/img/pytest_output.png)
 
 ## 🔧 Mejora del caso de uso
 

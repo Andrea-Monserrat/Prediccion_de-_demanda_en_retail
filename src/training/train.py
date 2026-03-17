@@ -66,6 +66,24 @@ def parse_train_args() -> argparse.Namespace:
     parser.add_argument("--prep-dir", default="data/prep")
     parser.add_argument("--models-dir", default="artifacts/models")
     parser.add_argument("--model-file", default="model.joblib")
+    parser.add_argument(
+        "--n-estimators",
+        type=int,
+        default=400,
+        help="Número de iteraciones del HistGradientBoosting",
+    )
+    parser.add_argument(
+        "--max-depth",
+        type=int,
+        default=8,
+        help="Profundidad máxima del árbol en HistGradientBoosting",
+    )
+    parser.add_argument(
+        "--learning-rate",
+        type=float,
+        default=0.08,
+        help="Tasa de aprendizaje del HistGradientBoosting",
+    )
     return parser.parse_args()
 
 
@@ -172,14 +190,24 @@ def _calcular_baseline_rmse(particion: ParticionEntrenamiento) -> float:
     return baseline_rmse
 
 
-def _definir_modelos_candidatos() -> dict[str, Any]:
-    """Define modelos candidatos a comparar (mismos que el notebook)."""
+def _definir_modelos_candidatos(
+    n_estimators: int = 400,
+    max_depth: int = 8,
+    learning_rate: float = 0.08,
+) -> dict[str, Any]:
+    """Define modelos candidatos a comparar.
+
+    Args:
+        n_estimators: Número de iteraciones del HistGradientBoosting.
+        max_depth: Profundidad máxima del árbol.
+        learning_rate: Tasa de aprendizaje del HistGradientBoosting.
+    """
     return {
         "HistGradientBoosting": HistGradientBoostingRegressor(
             loss="squared_error",
-            max_depth=8,
-            learning_rate=0.08,
-            max_iter=400,
+            max_depth=max_depth,
+            learning_rate=learning_rate,
+            max_iter=n_estimators,
             random_state=RANDOM_SEED,
         ),
         "Ridge": Ridge(alpha=1.0),
@@ -288,6 +316,9 @@ def _ejecutar_entrenamiento(
     prep_dir: Path,
     models_dir: Path,
     model_file: str,
+    n_estimators: int = 400,
+    max_depth: int = 8,
+    learning_rate: float = 0.08,
 ) -> None:
     """Orquesta el pipeline de entrenamiento sin inflar variables locales en main()."""
     # 1) Cargar inputs del pipeline de prep
@@ -303,7 +334,11 @@ def _ejecutar_entrenamiento(
     baseline_rmse = _calcular_baseline_rmse(particion)
 
     # 5) Evaluación de modelos candidatos
-    candidatos = _definir_modelos_candidatos()
+    candidatos = _definir_modelos_candidatos(
+        n_estimators=n_estimators,
+        max_depth=max_depth,
+        learning_rate=learning_rate,
+    )
     scores = _evaluar_modelos(candidatos, particion)
 
     # 6) Selección y entrenamiento final
@@ -342,6 +377,9 @@ def main() -> None:
             prep_dir=prep_dir,
             models_dir=models_dir,
             model_file=args.model_file,
+            n_estimators=args.n_estimators,
+            max_depth=args.max_depth,
+            learning_rate=args.learning_rate,
         )
 
         duracion = time.time() - tiempo_inicio

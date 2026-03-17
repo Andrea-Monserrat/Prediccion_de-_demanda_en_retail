@@ -31,6 +31,7 @@ build/
 data/**
 !data/**/
 !data/**/.gitkeep
+indicaciones.md
 
 # =========================
 # Logs: NO subir logs, pero sí carpeta vacía con .gitkeep

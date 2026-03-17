@@ -1,0 +1,168 @@
+#!/usr/bin/env python
+
+from __future__ import annotations
+
+import json
+import sys
+import traceback
+from pathlib import Path
+from typing import Any
+
+import joblib
+import numpy as np
+import pandas as pd
+from sklearn.base import clone
+from sklearn.ensemble import HistGradientBoostingRegressor
+from sklearn.linear_model import PoissonRegressor, Ridge
+from sklearn.metrics import mean_squared_error
+
+PREFIX = Path("/opt/ml")
+INPUT_PATH = PREFIX / "input" / "data" / "training"
+PARAM_PATH = PREFIX / "input" / "config" / "hyperparameters.json"
+MODEL_PATH = PREFIX / "model"
+OUTPUT_PATH = PREFIX / "output"
+
+TARGET_COL = "item_cnt_month"
+BASELINE_COL = "item_cnt_month_lag_1"
+CLIP_MIN = 0
+CLIP_MAX = 20
+RANDOM_SEED = 42
+
+
+def rmse(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+    return float(np.sqrt(mean_squared_error(y_true, y_pred)))
+
+
+def cargar_hyperparams() -> dict[str, Any]:
+    if not PARAM_PATH.exists():
+        return {}
+    return json.loads(PARAM_PATH.read_text())
+
+
+def cargar_inputs() -> tuple[pd.DataFrame, list[str], dict[str, Any]]:
+    matrix = pd.read_csv(INPUT_PATH / "matrix.csv.gz", low_memory=False)
+    feature_cols = json.loads((INPUT_PATH / "feature_cols.json").read_text())
+    meta = json.loads((INPUT_PATH / "meta.json").read_text())
+
+    print(f"action=cargar_inputs matrix_rows={len(matrix):,} n_features={len(feature_cols)}")
+    return matrix, feature_cols, meta
+
+
+def split_train_valid(
+    matrix: pd.DataFrame,
+    feature_cols: list[str],
+    valid_month: int,
+) -> tuple[pd.DataFrame, pd.Series, pd.DataFrame, pd.Series]:
+    mask_train = matrix["date_block_num"] < valid_month
+    mask_valid = matrix["date_block_num"] == valid_month
+
+    x_train = matrix.loc[mask_train, feature_cols]
+    y_train = matrix.loc[mask_train, TARGET_COL]
+    x_valid = matrix.loc[mask_valid, feature_cols]
+    y_valid = matrix.loc[mask_valid, TARGET_COL]
+
+    print(f"action=split train_rows={len(x_train):,} valid_rows={len(x_valid):,}")
+    return x_train, y_train, x_valid, y_valid
+
+
+def evaluar_modelos(
+    candidatos: dict[str, Any],
+    x_train: pd.DataFrame,
+    y_train: pd.Series,
+    x_valid: pd.DataFrame,
+    y_valid: pd.Series,
+) -> dict[str, float]:
+    scores: dict[str, float] = {}
+    for nombre, modelo in candidatos.items():
+        modelo.fit(x_train, y_train)
+        pred = np.clip(modelo.predict(x_valid), CLIP_MIN, CLIP_MAX)
+        score = rmse(y_valid.to_numpy(), pred)
+        scores[nombre] = score
+        print(f"action=evaluar model={nombre} rmse={score:.4f}")
+    return scores
+
+
+def train():
+    print("action=train status=iniciado")
+
+    params = cargar_hyperparams()
+    n_estimators = int(params.get("n_estimators", 400))
+    max_depth = int(params.get("max_depth", 8))
+    learning_rate = float(params.get("learning_rate", 0.08))
+
+    print(f"action=hyperparams n_estimators={n_estimators} max_depth={max_depth} learning_rate={learning_rate}")
+
+    matrix, feature_cols, meta = cargar_inputs()
+
+    valid_month = int(meta["valid_month"])
+    test_month = int(meta["test_month"])
+    print(f"action=meses valid_month={valid_month} test_month={test_month}")
+
+    x_train, y_train, x_valid, y_valid = split_train_valid(matrix, feature_cols, valid_month)
+
+    pred_baseline = x_valid[BASELINE_COL].to_numpy()
+    baseline_rmse = rmse(y_valid.to_numpy(), pred_baseline)
+    print(f"action=baseline rmse={baseline_rmse:.4f}")
+
+    candidatos = {
+        "HistGradientBoosting": HistGradientBoostingRegressor(
+            loss="squared_error",
+            max_depth=max_depth,
+            learning_rate=learning_rate,
+            max_iter=n_estimators,
+            random_state=RANDOM_SEED,
+        ),
+        "Ridge": Ridge(alpha=1.0),
+        "PoissonRegressor": PoissonRegressor(alpha=1e-4, max_iter=200),
+    }
+
+    scores = evaluar_modelos(candidatos, x_train, y_train, x_valid, y_valid)
+
+    mejor_nombre = min(scores, key=scores.get)
+    print(f"action=seleccion mejor_modelo={mejor_nombre} rmse={scores[mejor_nombre]:.4f}")
+
+    x_full = pd.concat([x_train, x_valid])
+    y_full = pd.concat([y_train, y_valid])
+    modelo_final = clone(candidatos[mejor_nombre])
+    modelo_final.fit(x_full, y_full)
+    print(f"action=entrenamiento_final rows={len(x_full):,}")
+
+    test_rows = matrix.loc[matrix["date_block_num"] == test_month].copy()
+    print(f"action=extraer_test_features rows={len(test_rows):,}")
+
+    MODEL_PATH.mkdir(parents=True, exist_ok=True)
+
+    joblib.dump(modelo_final, MODEL_PATH / "model.joblib")
+
+    (MODEL_PATH / "feature_cols.json").write_text(
+        json.dumps(feature_cols, indent=2)
+    )
+
+    test_rows.to_csv(
+        MODEL_PATH / "test_features.csv.gz",
+        index=False,
+        compression="gzip",
+    )
+
+    report = {
+        "baseline_rmse_lag_1": baseline_rmse,
+        "scores": scores,
+        "best_model": mejor_nombre,
+        "valid_month": valid_month,
+        "test_month": test_month,
+    }
+    (MODEL_PATH / "train_report.json").write_text(json.dumps(report, indent=2))
+
+    print(f"action=train status=exitoso mejor_modelo={mejor_nombre}")
+
+
+if __name__ == "__main__":
+    try:
+        train()
+        sys.exit(0)
+    except Exception as exc:
+        trc = traceback.format_exc()
+        OUTPUT_PATH.mkdir(parents=True, exist_ok=True)
+        (OUTPUT_PATH / "failure").write_text(f"{exc}\n{trc}")
+        print(f"{exc}\n{trc}", file=sys.stderr)
+        sys.exit(255)

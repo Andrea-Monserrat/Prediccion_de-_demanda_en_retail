@@ -20,7 +20,7 @@ import joblib
 import numpy as np
 import pandas as pd
 
-from prep import build_matrix
+from preprocessing.prep import build_matrix
 from utils.logging_config import get_logger
 
 # Logger estándar del proyecto

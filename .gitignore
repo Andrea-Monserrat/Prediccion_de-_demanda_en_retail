@@ -31,6 +31,11 @@ build/
 data/**
 !data/**/
 !data/**/.gitkeep
+# Archivos requeridos por SageMaker BYOC
+!data/**/matrix.csv.gz
+!data/**/feature_cols.json
+!data/**/meta.json
+!data/**/test_pairs.csv
 indicaciones.md
 
 # =========================
